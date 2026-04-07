@@ -55,11 +55,11 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(ACT2_En_GPIO_Port, ACT2_En_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : SD_Status_Pin WDO_Pin */
-  GPIO_InitStruct.Pin = SD_Status_Pin|WDO_Pin;
+  /*Configure GPIO pin : SD_Status_Pin */
+  GPIO_InitStruct.Pin = SD_Status_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(SD_Status_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : RTD_Pin SD_Out_Pin ACT1_En_Pin WDI_Pin
                            WD_En_Pin */
@@ -76,6 +76,16 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(ACT2_En_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : WDO_Pin */
+  GPIO_InitStruct.Pin = WDO_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(WDO_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
 

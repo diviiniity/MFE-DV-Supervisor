@@ -97,6 +97,10 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
+  /* BOARD INITIALIZATION */
+  HAL_GPIO_WritePin(SD_Out_GPIO_Port, SD_Out_Pin, GPIO_PIN_SET); // clear shutdown error
+  HAL_GPIO_WritePin(WD_En_GPIO_Port, WD_En_Pin, GPIO_PIN_RESET); // enable watchdog
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -119,6 +123,17 @@ int main(void)
   /* USER CODE END 3 */
 }
 
+HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	// Interrupt handler when watchdog WDO goes low, log it and reset board.
+	if (GPIO_Pin == WDO_Pin) {
+		char pBuf[64];
+		int len = sprintf(pBuf, "Watchdog Timeout");
+		HAL_UART_Transmit(&huart1, pBuf, len, 100);
+		HAL_NVIC_SystemReset();
+	} else {
+		return;
+	}
+}
 /**
   * @brief System Clock Configuration
   * @retval None

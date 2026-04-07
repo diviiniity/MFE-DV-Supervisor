@@ -75,6 +75,7 @@ void Error_Handler(void);
 #define WDI_GPIO_Port GPIOA
 #define WDO_Pin GPIO_PIN_9
 #define WDO_GPIO_Port GPIOA
+#define WDO_EXTI_IRQn EXTI9_5_IRQn
 #define WD_En_Pin GPIO_PIN_10
 #define WD_En_GPIO_Port GPIOA
 
