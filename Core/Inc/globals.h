@@ -21,6 +21,9 @@ extern volatile uint16_t g_tankAvg;
 extern volatile uint16_t g_brakeAdcLatest;
 extern volatile uint16_t g_tankAdcLatest;
 
+extern volatile uint8_t g_canErrorLatched;
+extern volatile uint8_t g_adcErrorActive;
+
 extern volatile uint8_t g_uartTxBusy;
 extern uint8_t g_uartTxBuf[UART_TX_SIZE];
 

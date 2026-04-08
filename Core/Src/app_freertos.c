@@ -28,6 +28,7 @@
 #include "usart.h"
 #include "gpio.h"
 #include "adc.h"
+#include "fdcan.h"
 
 #include "globals.h"
 
@@ -188,13 +189,9 @@ void monitorEBS(void *argument)
     g_brakeAvg = (uint16_t)(brakeRunningSum / sampleCount);
     g_tankAvg = (uint16_t)(tankRunningSum / sampleCount);
 
-    if (g_brakeAvg < BRAKE_OK_THRESHOLD || g_tankAvg < TANK_OK_THRESHOLD) {
-    	HAL_GPIO_WritePin(ACT1_En_GPIO_Port, ACT1_En_Pin, GPIO_PIN_SET);
-    	HAL_GPIO_WritePin(ACT2_En_GPIO_Port, ACT2_En_Pin, GPIO_PIN_SET);
-    } else {
-    	HAL_GPIO_WritePin(ACT1_En_GPIO_Port, ACT1_En_Pin, GPIO_PIN_RESET);
-    	HAL_GPIO_WritePin(ACT2_En_GPIO_Port, ACT2_En_Pin, GPIO_PIN_RESET);
-    }
+
+    g_adcErrorActive = (g_brakeAvg < BRAKE_OK_THRESHOLD || g_tankAvg < TANK_OK_THRESHOLD) ? 1U : 0U;
+    checkErrors();
 
     if (!g_uartTxBusy) {
     	int len = snprintf((char*)g_uartTxBuf, UART_TX_SIZE, "Brake: %u || Tank: %u\r\n", g_brakeAvg, g_tankAvg);
@@ -239,10 +236,47 @@ void monitorWD(void *argument)
 void transmitCAN(void *argument)
 {
   /* USER CODE BEGIN transmitCAN */
+  FDCAN_TxHeaderTypeDef txHeader = {0};
+  uint8_t txData[8] = {0};
+
+  txHeader.Identifier = 0x01;
+  txHeader.IdType = FDCAN_STANDARD_ID;
+  txHeader.TxFrameType = FDCAN_DATA_FRAME;
+  txHeader.DataLength = FDCAN_DLC_BYTES_8;
+  txHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+  txHeader.BitRateSwitch = FDCAN_BRS_OFF;
+  txHeader.FDFormat = FDCAN_CLASSIC_CAN;
+  txHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+  txHeader.MessageMarker = 0;
+
+  if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK) {
+	Error_Handler();
+  }
+  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK) {
+	Error_Handler();
+  }
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+	  txData[0] = (uint8_t)HAL_GPIO_ReadPin(SD_Status_GPIO_Port, SD_Status_Pin);
+	  txData[1] = (uint8_t)(
+	  		((uint8_t)HAL_GPIO_ReadPin(ACT1_En_GPIO_Port, ACT1_En_Pin) & 0x01U) |
+	  		((((uint8_t)HAL_GPIO_ReadPin(ACT2_En_GPIO_Port, ACT2_En_Pin) & 0x01U) << 1U))
+	  );
+
+	  txData[2] = (uint8_t)(g_brakeAvg & 0xFFU);
+	  txData[3] = (uint8_t)((g_brakeAvg >> 8U) & 0xFFU);
+	  txData[4] = (uint8_t)(g_tankAvg & 0xFFU);
+	  txData[5] = (uint8_t)((g_tankAvg >> 8U) & 0xFFU);
+
+	  txData[6] = (uint8_t)HAL_GPIO_ReadPin(RTD_GPIO_Port, RTD_Pin);
+	  txData[7] = (uint8_t)(HAL_GPIO_ReadPin(WDO_GPIO_Port, WDO_Pin) == GPIO_PIN_RESET);
+
+	  if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData) != HAL_OK) {
+	  	Error_Handler();
+	  }
+
+	  osDelay(10);
   }
   /* USER CODE END transmitCAN */
 }

@@ -29,6 +29,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "globals.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -178,15 +179,54 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void checkErrors() {
+    uint8_t errorActive = (g_canErrorLatched || g_adcErrorActive);
+
+    if (errorActive) {
+        HAL_GPIO_WritePin(RTD_GPIO_Port, RTD_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(SD_Out_GPIO_Port, SD_Out_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(ACT1_En_GPIO_Port, ACT1_En_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(ACT2_En_GPIO_Port, ACT2_En_Pin, GPIO_PIN_SET);
+    } else {
+        HAL_GPIO_WritePin(RTD_GPIO_Port, RTD_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(SD_Out_GPIO_Port, SD_Out_Pin, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(ACT1_En_GPIO_Port, ACT1_En_Pin, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(ACT2_En_GPIO_Port, ACT2_En_Pin, GPIO_PIN_RESET);
+    }
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	// Interrupt handler when watchdog WDO goes low, log it and reset board.
 	if (GPIO_Pin == WDO_Pin) {
 		char pBuf[64];
 		int len = sprintf(pBuf, "Watchdog Timeout");
-		HAL_UART_Transmit(&huart1, pBuf, len, 100);
+		HAL_UART_Transmit(&huart1, (uint8_t*)pBuf, len, 100);
 		HAL_NVIC_SystemReset();
 	} else {
 		return;
+	}
+}
+
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
+{
+	if ((hfdcan != &hfdcan1) || ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == 0U)) {
+		return;
+	}
+
+	FDCAN_RxHeaderTypeDef rxHeader = {0};
+	uint8_t rxData[8] = {0};
+
+	if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rxHeader, rxData) != HAL_OK) {
+		return;
+	}
+
+	if ((rxHeader.IdType == FDCAN_STANDARD_ID) && (rxHeader.Identifier == 0x02U)) {
+		g_canErrorLatched = 1;
+		checkErrors();
+	}
+	if ((rxHeader.IdType == FDCAN_STANDARD_ID) && (rxHeader.Identifier == 0x03U)) {
+		g_canErrorLatched = 0;
+		checkErrors();
 	}
 }
 
