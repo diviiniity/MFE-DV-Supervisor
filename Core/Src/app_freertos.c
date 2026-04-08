@@ -27,6 +27,11 @@
 /* USER CODE BEGIN Includes */
 #include "usart.h"
 #include "gpio.h"
+#include "adc.h"
+
+#include "globals.h"
+
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,7 +41,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BRAKE_OK_THRESHOLD 1300
+#define TANK_OK_THRESHOLD 1300
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -165,9 +171,60 @@ void MX_FREERTOS_Init(void) {
 void monitorEBS(void *argument)
 {
   /* USER CODE BEGIN monitorEBS */
+  static uint16_t writeIndex = 0;
+  static uint16_t sampleCount = 0;
+  static uint32_t brakeRunningSum = 0;
+  static uint32_t tankRunningSum = 0;
   /* Infinite loop */
   for(;;)
   {
+	HAL_ADC_Start(&hadc1);
+	HAL_ADC_Start(&hadc2);
+
+	HAL_ADC_PollForConversion(&hadc1, 10);
+	HAL_ADC_PollForConversion(&hadc2, 10);
+
+	uint16_t brake = (uint16_t)HAL_ADC_GetValue(&hadc1);
+	uint16_t tank = (uint16_t)HAL_ADC_GetValue(&hadc2);
+
+	HAL_ADC_Stop(&hadc1);
+	HAL_ADC_Stop(&hadc2);
+
+	if (sampleCount < ROLLING_WINDOW_SIZE) sampleCount++;
+	else {
+		brakeRunningSum -= g_brakeWindow[writeIndex];
+		tankRunningSum -= g_tankWindow[writeIndex];
+	}
+
+	g_brakeWindow[writeIndex] = brake;
+	g_tankWindow[writeIndex] = tank;
+
+	brakeRunningSum += brake;
+	tankRunningSum += tank;
+
+	writeIndex = (writeIndex + 1) % ROLLING_WINDOW_SIZE;
+
+    g_brakeAvg = (uint16_t)(brakeRunningSum / sampleCount);
+    g_tankAvg = (uint16_t)(tankRunningSum / sampleCount);
+
+    if (g_brakeAvg < BRAKE_OK_THRESHOLD || g_tankAvg < TANK_OK_THRESHOLD) {
+    	HAL_GPIO_WritePin(ACT1_En_GPIO_Port, ACT1_En_Pin, GPIO_PIN_SET);
+    	HAL_GPIO_WritePin(ACT2_En_GPIO_Port, ACT2_En_Pin, GPIO_PIN_SET);
+    } else {
+    	HAL_GPIO_WritePin(ACT1_En_GPIO_Port, ACT1_En_Pin, GPIO_PIN_RESET);
+    	HAL_GPIO_WritePin(ACT2_En_GPIO_Port, ACT2_En_Pin, GPIO_PIN_RESET);
+    }
+
+    if (!g_uartTxBusy) {
+    	int len = snprintf((char*)g_uartTxBuf, UART_TX_SIZE, "Brake: %u || Tank: %u\r\n", g_brakeAvg, g_tankAvg);
+    	if (len > 0 && len < UART_TX_BUF_SIZE) {
+    	    g_uartTxBusy = 1;
+    	    if (HAL_UART_Transmit_DMA(&huart1, g_uartTxBuf, (uint16_t)len) != HAL_OK) {
+    	        g_uartTxBusy = 0;
+    	    }
+    	}
+    }
+
     osDelay(1);
   }
   /* USER CODE END monitorEBS */
@@ -220,20 +277,9 @@ void transmitCAN(void *argument)
 void controlACT(void *argument)
 {
   /* USER CODE BEGIN controlACT */
-  HAL_GPIO_WritePin(ACT1_En_GPIO_Port, ACT1_En_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(ACT2_En_GPIO_Port, ACT2_En_Pin, GPIO_PIN_RESET);
   /* Infinite loop */
   for(;;)
   {
-	HAL_GPIO_TogglePin(ACT1_En_GPIO_Port, ACT1_En_Pin);
-	HAL_GPIO_TogglePin(ACT2_En_GPIO_Port, ACT2_En_Pin);
-
-	int act1 = HAL_GPIO_ReadPin(ACT1_En_GPIO_Port, ACT1_En_Pin);
-	int act2 = HAL_GPIO_ReadPin(ACT2_En_GPIO_Port, ACT2_En_Pin);
-	int sd_state = HAL_GPIO_ReadPin(SD_Out_GPIO_Port, SD_Out_Pin);
-	char pBuf[64];
-	int len = sprintf(pBuf, "ACT1: %d\nACT2: %d\n", act1, act2);
-	HAL_UART_Transmit(&huart1, pBuf, len, 100);
     osDelay(1000);
   }
   /* USER CODE END controlACT */

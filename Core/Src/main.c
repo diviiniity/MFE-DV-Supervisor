@@ -20,6 +20,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "adc.h"
+#include "dma.h"
 #include "fdcan.h"
 #include "usart.h"
 #include "gpio.h"
@@ -91,6 +92,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
   MX_ADC2_Init();
   MX_FDCAN1_Init();
@@ -99,8 +101,11 @@ int main(void)
 
   /* BOARD INITIALIZATION */
   HAL_GPIO_WritePin(SD_Out_GPIO_Port, SD_Out_Pin, GPIO_PIN_SET); // clear shutdown error
+  HAL_GPIO_WritePin(RTD_GPIO_Port, RTD_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(WD_En_GPIO_Port, WD_En_Pin, GPIO_PIN_RESET); // enable watchdog
 
+  HAL_ADC_Start(&hadc1);
+  HAL_ADC_Start(&hadc2);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -121,18 +126,6 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
-}
-
-HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	// Interrupt handler when watchdog WDO goes low, log it and reset board.
-	if (GPIO_Pin == WDO_Pin) {
-		char pBuf[64];
-		int len = sprintf(pBuf, "Watchdog Timeout");
-		HAL_UART_Transmit(&huart1, pBuf, len, 100);
-		HAL_NVIC_SystemReset();
-	} else {
-		return;
-	}
 }
 /**
   * @brief System Clock Configuration
@@ -181,7 +174,24 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	// Interrupt handler when watchdog WDO goes low, log it and reset board.
+	if (GPIO_Pin == WDO_Pin) {
+		char pBuf[64];
+		int len = sprintf(pBuf, "Watchdog Timeout");
+		HAL_UART_Transmit(&huart1, pBuf, len, 100);
+		HAL_NVIC_SystemReset();
+	} else {
+		return;
+	}
+}
 
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart == &huart1) {
+        g_uartTxBusy = 0;
+    }
+}
 /* USER CODE END 4 */
 
 /**
