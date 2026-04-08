@@ -75,13 +75,6 @@ const osThreadAttr_t transmitCANTask_attributes = {
   .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
-/* Definitions for controlACTTask */
-osThreadId_t controlACTTaskHandle;
-const osThreadAttr_t controlACTTask_attributes = {
-  .name = "controlACTTask",
-  .priority = (osPriority_t) osPriorityLow,
-  .stack_size = 128 * 4
-};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -91,7 +84,6 @@ const osThreadAttr_t controlACTTask_attributes = {
 void monitorEBS(void *argument);
 void monitorWD(void *argument);
 void transmitCAN(void *argument);
-void controlACT(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -148,9 +140,6 @@ void MX_FREERTOS_Init(void) {
   /* creation of transmitCANTask */
   transmitCANTaskHandle = osThreadNew(transmitCAN, NULL, &transmitCANTask_attributes);
 
-  /* creation of controlACTTask */
-  controlACTTaskHandle = osThreadNew(controlACT, NULL, &controlACTTask_attributes);
-
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -178,23 +167,15 @@ void monitorEBS(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	HAL_ADC_Start(&hadc1);
-	HAL_ADC_Start(&hadc2);
-
-	HAL_ADC_PollForConversion(&hadc1, 10);
-	HAL_ADC_PollForConversion(&hadc2, 10);
-
-	uint16_t brake = (uint16_t)HAL_ADC_GetValue(&hadc1);
-	uint16_t tank = (uint16_t)HAL_ADC_GetValue(&hadc2);
-
-	HAL_ADC_Stop(&hadc1);
-	HAL_ADC_Stop(&hadc2);
 
 	if (sampleCount < ROLLING_WINDOW_SIZE) sampleCount++;
 	else {
 		brakeRunningSum -= g_brakeWindow[writeIndex];
 		tankRunningSum -= g_tankWindow[writeIndex];
 	}
+
+	uint16_t brake = g_brakeAdcLatest;
+	uint16_t tank  = g_tankAdcLatest;
 
 	g_brakeWindow[writeIndex] = brake;
 	g_tankWindow[writeIndex] = tank;
@@ -217,14 +198,13 @@ void monitorEBS(void *argument)
 
     if (!g_uartTxBusy) {
     	int len = snprintf((char*)g_uartTxBuf, UART_TX_SIZE, "Brake: %u || Tank: %u\r\n", g_brakeAvg, g_tankAvg);
-    	if (len > 0 && len < UART_TX_BUF_SIZE) {
+    	if (len > 0 && len < UART_TX_SIZE) {
     	    g_uartTxBusy = 1;
     	    if (HAL_UART_Transmit_DMA(&huart1, g_uartTxBuf, (uint16_t)len) != HAL_OK) {
     	        g_uartTxBusy = 0;
     	    }
     	}
     }
-
     osDelay(1);
   }
   /* USER CODE END monitorEBS */
@@ -265,24 +245,6 @@ void transmitCAN(void *argument)
     osDelay(1);
   }
   /* USER CODE END transmitCAN */
-}
-
-/* USER CODE BEGIN Header_controlACT */
-/**
-* @brief Function implementing the controlACTTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_controlACT */
-void controlACT(void *argument)
-{
-  /* USER CODE BEGIN controlACT */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1000);
-  }
-  /* USER CODE END controlACT */
 }
 
 /* Private application code --------------------------------------------------*/

@@ -18,6 +18,9 @@ extern volatile uint16_t g_tankWindow[ROLLING_WINDOW_SIZE];
 extern volatile uint16_t g_brakeAvg;
 extern volatile uint16_t g_tankAvg;
 
+extern volatile uint16_t g_brakeAdcLatest;
+extern volatile uint16_t g_tankAdcLatest;
+
 extern volatile uint8_t g_uartTxBusy;
 extern uint8_t g_uartTxBuf[UART_TX_SIZE];
 

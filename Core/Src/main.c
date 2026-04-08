@@ -22,12 +22,13 @@
 #include "adc.h"
 #include "dma.h"
 #include "fdcan.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "globals.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -97,6 +98,7 @@ int main(void)
   MX_ADC2_Init();
   MX_FDCAN1_Init();
   MX_USART1_UART_Init();
+  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
 
   /* BOARD INITIALIZATION */
@@ -104,8 +106,9 @@ int main(void)
   HAL_GPIO_WritePin(RTD_GPIO_Port, RTD_Pin, GPIO_PIN_SET);
   HAL_GPIO_WritePin(WD_En_GPIO_Port, WD_En_Pin, GPIO_PIN_RESET); // enable watchdog
 
-  HAL_ADC_Start(&hadc1);
-  HAL_ADC_Start(&hadc2);
+  HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&g_brakeAdcLatest, 1);
+  HAL_ADC_Start_DMA(&hadc2, (uint32_t *)&g_tankAdcLatest, 1);
+  HAL_TIM_Base_Start(&htim7);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -127,6 +130,7 @@ int main(void)
   }
   /* USER CODE END 3 */
 }
+
 /**
   * @brief System Clock Configuration
   * @retval None
