@@ -176,7 +176,7 @@ void monitorEBS(void *argument)
 	}
 
 	uint16_t brake = g_brakeAdcLatest;
-	uint16_t tank  = g_tankAdcLatest;
+	uint16_t tank = g_tankAdcLatest;
 
 	g_brakeWindow[writeIndex] = brake;
 	g_tankWindow[writeIndex] = tank;
@@ -190,11 +190,19 @@ void monitorEBS(void *argument)
     g_tankAvg = (uint16_t)(tankRunningSum / sampleCount);
 
 
+
     g_adcErrorActive = (g_brakeAvg < BRAKE_OK_THRESHOLD || g_tankAvg < TANK_OK_THRESHOLD) ? 1U : 0U;
     checkErrors();
 
     if (!g_uartTxBusy) {
-    	int len = snprintf((char*)g_uartTxBuf, UART_TX_SIZE, "Brake: %u || Tank: %u\r\n", g_brakeAvg, g_tankAvg);
+    	int len = snprintf((char*)g_uartTxBuf, UART_TX_SIZE,
+    	        "P:%4u(%d) E:%4u(%d) | TS:%d | WDO:%d WDI:%d EN:%d | RTD:%d SDC:%d A1:%d A2:%d\r\n",
+				g_brakeAvg, 1,
+				g_tankAvg,   1,
+    	        1,
+    	        1, 1, 1,
+    	        1, 1, 1, 1
+    	    );
     	if (len > 0 && len < UART_TX_SIZE) {
     	    g_uartTxBusy = 1;
     	    if (HAL_UART_Transmit_DMA(&huart1, g_uartTxBuf, (uint16_t)len) != HAL_OK) {

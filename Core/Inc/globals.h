@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 #define ROLLING_WINDOW_SIZE 100
-#define UART_TX_SIZE    64
+#define UART_TX_SIZE 128
 
 extern volatile uint16_t g_brakeWindow[ROLLING_WINDOW_SIZE];
 extern volatile uint16_t g_tankWindow[ROLLING_WINDOW_SIZE];
