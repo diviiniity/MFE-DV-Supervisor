@@ -278,7 +278,6 @@ void transmitCAN(void *argument)
 	  txData[5] = (uint8_t)((g_tankAvg >> 8U) & 0xFFU);
 
 	  txData[6] = (uint8_t)HAL_GPIO_ReadPin(RTD_GPIO_Port, RTD_Pin);
-	  txData[7] = (uint8_t)(HAL_GPIO_ReadPin(WDO_GPIO_Port, WDO_Pin) == GPIO_PIN_RESET);
 
 	  if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &txHeader, txData) != HAL_OK) {
 	  	Error_Handler();
